@@ -1,4 +1,43 @@
 import { runAppleScript, runAppleScriptFile } from '../utils/applescript.js';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+
+/**
+ * Helper to wrap XML content in a full plist if not already wrapped
+ */
+function wrapXmlInPlist(xml: string): string {
+  const trimmed = xml.trim();
+  if (trimmed.startsWith('<?xml') || trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<plist')) {
+    return trimmed;
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+${trimmed}
+</plist>`;
+}
+
+/**
+ * Write XML to a temp file and return the path.
+ * This avoids AppleScript string escaping issues that cause "Invalid XML From AppleScript" errors.
+ */
+function writeTempXml(xml: string): string {
+  const tempPath = path.join(os.tmpdir(), `km_action_${Date.now()}.plist`);
+  fs.writeFileSync(tempPath, wrapXmlInPlist(xml), 'utf8');
+  return tempPath;
+}
+
+/**
+ * Clean up a temp file
+ */
+function cleanupTempFile(filePath: string): void {
+  try {
+    fs.unlinkSync(filePath);
+  } catch {
+    // Ignore cleanup errors
+  }
+}
 
 
 interface MacroInfo {
@@ -224,14 +263,14 @@ end tell`;
  * Add an action to an existing macro
  */
 export async function addAction(macroIdentifier: string, actionXml: string): Promise<string> {
+  const tempPath = writeTempXml(actionXml);
   try {
-    const escapedXml = actionXml.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-
     const script = `
+set xmlContent to read POSIX file "${tempPath}" as «class utf8»
 tell application "Keyboard Maestro"
   set theMacro to first macro whose name is "${macroIdentifier}" or id is "${macroIdentifier}"
   tell theMacro
-    make new action with properties {xml:"${escapedXml}"}
+    make new action with properties {xml:xmlContent}
   end tell
 end tell`;
 
@@ -239,6 +278,8 @@ end tell`;
     return `Action added to macro "${macroIdentifier}"`;
   } catch (error: any) {
     throw new Error(`Failed to add action: ${error.message}`);
+  } finally {
+    cleanupTempFile(tempPath);
   }
 }
 
@@ -246,14 +287,14 @@ end tell`;
  * Add a trigger to a macro
  */
 export async function addTrigger(macroIdentifier: string, triggerXml: string): Promise<string> {
+  const tempPath = writeTempXml(triggerXml);
   try {
-    const escapedXml = triggerXml.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-
     const script = `
+set xmlContent to read POSIX file "${tempPath}" as «class utf8»
 tell application "Keyboard Maestro"
   set theMacro to first macro whose name is "${macroIdentifier}" or id is "${macroIdentifier}"
   tell theMacro
-    make new trigger with properties {xml:"${escapedXml}"}
+    make new trigger with properties {xml:xmlContent}
   end tell
 end tell`;
 
@@ -261,6 +302,8 @@ end tell`;
     return `Trigger added to macro "${macroIdentifier}"`;
   } catch (error: any) {
     throw new Error(`Failed to add trigger: ${error.message}`);
+  } finally {
+    cleanupTempFile(tempPath);
   }
 }
 
@@ -443,15 +486,14 @@ end tell`;
  * Set the XML of a specific action in a macro (edit the action)
  */
 export async function setActionXml(macroIdentifier: string, actionIndex: number, xml: string): Promise<string> {
+  const tempPath = writeTempXml(xml);
   try {
-    // Escape the XML for AppleScript
-    const escapedXml = xml.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-
     const script = `
+set xmlContent to read POSIX file "${tempPath}" as «class utf8»
 tell application "Keyboard Maestro"
   set theMacro to first macro whose name is "${macroIdentifier}" or id is "${macroIdentifier}"
   tell theMacro
-    set xml of action ${actionIndex} to "${escapedXml}"
+    set xml of action ${actionIndex} to xmlContent
   end tell
 end tell`;
 
@@ -459,6 +501,8 @@ end tell`;
     return `Action ${actionIndex} in macro "${macroIdentifier}" updated successfully`;
   } catch (error: any) {
     throw new Error(`Failed to set action XML: ${error.message}`);
+  } finally {
+    cleanupTempFile(tempPath);
   }
 }
 
@@ -604,15 +648,14 @@ end tell`;
  * Set the XML of a specific trigger in a macro
  */
 export async function setTriggerXml(macroIdentifier: string, triggerIndex: number, xml: string): Promise<string> {
+  const tempPath = writeTempXml(xml);
   try {
-    // Escape the XML for AppleScript
-    const escapedXml = xml.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-
     const script = `
+set xmlContent to read POSIX file "${tempPath}" as «class utf8»
 tell application "Keyboard Maestro"
   set theMacro to first macro whose name is "${macroIdentifier}" or id is "${macroIdentifier}"
   tell theMacro
-    set xml of trigger ${triggerIndex} to "${escapedXml}"
+    set xml of trigger ${triggerIndex} to xmlContent
   end tell
 end tell`;
 
@@ -620,5 +663,7 @@ end tell`;
     return `Trigger ${triggerIndex} in macro "${macroIdentifier}" updated successfully`;
   } catch (error: any) {
     throw new Error(`Failed to set trigger XML: ${error.message}`);
+  } finally {
+    cleanupTempFile(tempPath);
   }
 }
