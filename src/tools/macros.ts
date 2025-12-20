@@ -780,7 +780,7 @@ export async function addDisplayTextAction(
 ): Promise<string> {
   const xml = `<dict>
 	<key>MacroActionType</key>
-	<string>DisplayText</string>
+	<string>Alert</string>
 	<key>Title</key>
 	<string>${escapeXml(title)}</string>
 	<key>Text</key>
