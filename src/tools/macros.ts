@@ -155,30 +155,12 @@ end tell`;
  */
 export async function getMacroXml(identifier: string): Promise<string> {
   try {
-    // Get all macros XML and extract the one we want
-    const xmlHex = await runAppleScript('tell application "Keyboard Maestro Engine" to getmacros');
-    const xml = Buffer.from(xmlHex.replace(/[^0-9A-Fa-f]/g, ''), 'hex').toString('utf8');
-
-    // Find the macro by name or UID in the XML
-    // Look for the macro dict that contains this name or uid
-    const searchTerm = identifier.toUpperCase();
-
-    // Try to find a macro block with matching name or uid
-    const macroRegex = /<dict>[\s\S]*?<key>name<\/key>\s*<string>([^<]+)<\/string>[\s\S]*?<key>uid<\/key>\s*<string>([^<]+)<\/string>[\s\S]*?<\/dict>/gi;
-
-    let match;
-    while ((match = macroRegex.exec(xml)) !== null) {
-      const name = match[1];
-      const uid = match[2];
-
-      if (name === identifier || name.toUpperCase() === searchTerm ||
-        uid === identifier || uid.toUpperCase() === searchTerm) {
-        // Return the full matched dict
-        return match[0];
-      }
-    }
-
-    throw new Error(`Macro "${identifier}" not found`);
+    const script = `
+tell application "Keyboard Maestro"
+  set theMacro to first macro whose name is "${identifier}" or id is "${identifier}"
+  return xml of theMacro
+end tell`;
+    return await runAppleScriptFile(script);
   } catch (error: any) {
     throw new Error(`Failed to get macro XML: ${error.message}`);
   }
@@ -265,6 +247,14 @@ end tell`;
 export async function addAction(macroIdentifier: string, actionXml: string): Promise<string> {
   const tempPath = writeTempXml(actionXml);
   try {
+    // Get current action count before adding
+    const countScript = `
+tell application "Keyboard Maestro"
+  set theMacro to first macro whose name is "${macroIdentifier}" or id is "${macroIdentifier}"
+  return count of actions of theMacro
+end tell`;
+    const beforeCount = parseInt(await runAppleScriptFile(countScript)) || 0;
+
     const script = `
 set xmlContent to read POSIX file "${tempPath}" as «class utf8»
 tell application "Keyboard Maestro"
@@ -275,11 +265,38 @@ tell application "Keyboard Maestro"
 end tell`;
 
     await runAppleScriptFile(script);
+
+    // Verify action was actually added
+    const afterCount = parseInt(await runAppleScriptFile(countScript)) || 0;
+    if (afterCount <= beforeCount) {
+      throw new Error('Action was not created - XML may be invalid or malformed');
+    }
+
     return `Action added to macro "${macroIdentifier}"`;
   } catch (error: any) {
     throw new Error(`Failed to add action: ${error.message}`);
   } finally {
     cleanupTempFile(tempPath);
+  }
+}
+
+/**
+ * Move a macro to a different group
+ */
+export async function moveMacroToGroup(macroIdentifier: string, groupIdentifier: string): Promise<string> {
+  try {
+    const escapedMacro = macroIdentifier.replace(/"/g, '\\"');
+    const escapedGroup = groupIdentifier.replace(/"/g, '\\"');
+    const script = `
+tell application "Keyboard Maestro"
+  set theMacro to first macro whose name is "${escapedMacro}" or id is "${escapedMacro}"
+  set theGroup to first macro group whose name is "${escapedGroup}" or id is "${escapedGroup}"
+  move theMacro to theGroup
+end tell`;
+    await runAppleScriptFile(script);
+    return `Macro "${macroIdentifier}" moved to group "${groupIdentifier}"`;
+  } catch (error: any) {
+    throw new Error(`Failed to move macro: ${error.message}`);
   }
 }
 

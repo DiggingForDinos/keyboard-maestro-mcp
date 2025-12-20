@@ -34,6 +34,7 @@ import {
     getTriggerXml,
     setTriggerXml,
     searchMacros,
+    moveMacroToGroup,
     // High-level action helpers
     addNotificationAction,
     addPauseAction,
@@ -256,6 +257,24 @@ const TOOLS = [
                 },
             },
             required: ['identifier'],
+        },
+    },
+    {
+        name: 'km_move_macro',
+        description: 'Move a macro to a different macro group.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                macroIdentifier: {
+                    type: 'string',
+                    description: 'Macro name or UID to move',
+                },
+                groupIdentifier: {
+                    type: 'string',
+                    description: 'Target group name or UID',
+                },
+            },
+            required: ['macroIdentifier', 'groupIdentifier'],
         },
     },
 
@@ -639,11 +658,11 @@ const TOOLS = [
                 },
                 thenActionsXml: {
                     type: 'string',
-                    description: 'Optional: XML for actions to run if condition is true (array of dict elements)',
+                    description: 'Optional: XML actions for true condition. Pass one or more <dict>...</dict> elements concatenated (they get wrapped in <array>). Example: <dict><key>MacroActionType</key><string>Notification</string><key>Title</key><string>Hi</string><key>Text</key><string>Msg</string></dict>',
                 },
                 elseActionsXml: {
                     type: 'string',
-                    description: 'Optional: XML for actions to run if condition is false (array of dict elements)',
+                    description: 'Optional: XML actions for false condition. Same format as thenActionsXml.',
                 },
             },
             required: ['macroIdentifier', 'variable', 'containsValue'],
@@ -665,11 +684,11 @@ const TOOLS = [
                 },
                 thenActionsXml: {
                     type: 'string',
-                    description: 'Optional: XML for actions to run if condition is true (array of dict elements)',
+                    description: 'Optional: XML actions for true condition. Pass one or more <dict>...</dict> elements concatenated (they get wrapped in <array>). Example: <dict><key>MacroActionType</key><string>Notification</string><key>Title</key><string>Hi</string><key>Text</key><string>Msg</string></dict>',
                 },
                 elseActionsXml: {
                     type: 'string',
-                    description: 'Optional: XML for actions to run if condition is false (array of dict elements)',
+                    description: 'Optional: XML actions for false condition. Same format as thenActionsXml.',
                 },
             },
             required: ['macroIdentifier', 'calculation'],
@@ -825,6 +844,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 if (!identifier) throw new Error('identifier is required');
                 const parameter = args?.parameter as string | undefined;
                 const result = await executeMacro(identifier, parameter);
+                return { content: [{ type: 'text', text: result }] };
+            }
+
+            case 'km_move_macro': {
+                const macroId = args?.macroIdentifier as string;
+                const groupId = args?.groupIdentifier as string;
+                if (!macroId) throw new Error('macroIdentifier is required');
+                if (!groupId) throw new Error('groupIdentifier is required');
+                const result = await moveMacroToGroup(macroId, groupId);
                 return { content: [{ type: 'text', text: result }] };
             }
 
