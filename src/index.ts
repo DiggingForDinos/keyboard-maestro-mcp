@@ -33,7 +33,17 @@ import {
     toggleGroup,
     getTriggerXml,
     setTriggerXml,
-    searchMacros
+    searchMacros,
+    // High-level action helpers
+    addNotificationAction,
+    addPauseAction,
+    addSetVariableAction,
+    addCalculationAction,
+    addDisplayTextAction,
+    addIfVariableContainsAction,
+    addIfCalculationAction,
+    addExecuteMacroAction,
+    addShellScriptAction
 } from './tools/macros.js';
 import { getVariable, setVariable, deleteVariable } from './tools/variables.js';
 
@@ -497,6 +507,218 @@ const TOOLS = [
             required: ['macroIdentifier', 'triggerIndex', 'xml'],
         },
     },
+
+    // High-level Action Helper Tools
+    {
+        name: 'km_add_notification',
+        description: 'Add a notification action to a macro. Much simpler than using km_add_action with raw XML.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                macroIdentifier: {
+                    type: 'string',
+                    description: 'Macro name or UID',
+                },
+                title: {
+                    type: 'string',
+                    description: 'Notification title',
+                },
+                message: {
+                    type: 'string',
+                    description: 'Notification message/body text',
+                },
+                subtitle: {
+                    type: 'string',
+                    description: 'Optional subtitle',
+                },
+            },
+            required: ['macroIdentifier', 'title', 'message'],
+        },
+    },
+    {
+        name: 'km_add_pause',
+        description: 'Add a pause action to a macro.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                macroIdentifier: {
+                    type: 'string',
+                    description: 'Macro name or UID',
+                },
+                seconds: {
+                    type: 'number',
+                    description: 'Number of seconds to pause',
+                },
+            },
+            required: ['macroIdentifier', 'seconds'],
+        },
+    },
+    {
+        name: 'km_add_set_variable',
+        description: 'Add an action to set a variable to a text value.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                macroIdentifier: {
+                    type: 'string',
+                    description: 'Macro name or UID',
+                },
+                variable: {
+                    type: 'string',
+                    description: 'Variable name to set',
+                },
+                value: {
+                    type: 'string',
+                    description: 'Value to set the variable to',
+                },
+            },
+            required: ['macroIdentifier', 'variable', 'value'],
+        },
+    },
+    {
+        name: 'km_add_calculation',
+        description: 'Add an action to set a variable to the result of a calculation (e.g., "Counter + 1").',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                macroIdentifier: {
+                    type: 'string',
+                    description: 'Macro name or UID',
+                },
+                variable: {
+                    type: 'string',
+                    description: 'Variable name to set',
+                },
+                expression: {
+                    type: 'string',
+                    description: 'Calculation expression (e.g., "Counter + 1", "Price * Quantity")',
+                },
+            },
+            required: ['macroIdentifier', 'variable', 'expression'],
+        },
+    },
+    {
+        name: 'km_add_display_text',
+        description: 'Add an action to display text in a window.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                macroIdentifier: {
+                    type: 'string',
+                    description: 'Macro name or UID',
+                },
+                title: {
+                    type: 'string',
+                    description: 'Window title',
+                },
+                text: {
+                    type: 'string',
+                    description: 'Text to display',
+                },
+            },
+            required: ['macroIdentifier', 'title', 'text'],
+        },
+    },
+    {
+        name: 'km_add_if_variable_contains',
+        description: 'Add an If-Then-Else action that checks if a variable contains a value.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                macroIdentifier: {
+                    type: 'string',
+                    description: 'Macro name or UID',
+                },
+                variable: {
+                    type: 'string',
+                    description: 'Variable name to check',
+                },
+                containsValue: {
+                    type: 'string',
+                    description: 'Value to check if variable contains',
+                },
+                thenActionsXml: {
+                    type: 'string',
+                    description: 'Optional: XML for actions to run if condition is true (array of dict elements)',
+                },
+                elseActionsXml: {
+                    type: 'string',
+                    description: 'Optional: XML for actions to run if condition is false (array of dict elements)',
+                },
+            },
+            required: ['macroIdentifier', 'variable', 'containsValue'],
+        },
+    },
+    {
+        name: 'km_add_if_calculation',
+        description: 'Add an If-Then-Else action that checks a calculation condition (e.g., "Counter >= 5").',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                macroIdentifier: {
+                    type: 'string',
+                    description: 'Macro name or UID',
+                },
+                calculation: {
+                    type: 'string',
+                    description: 'Calculation condition (e.g., "Counter >= 5", "Price < MaxPrice")',
+                },
+                thenActionsXml: {
+                    type: 'string',
+                    description: 'Optional: XML for actions to run if condition is true (array of dict elements)',
+                },
+                elseActionsXml: {
+                    type: 'string',
+                    description: 'Optional: XML for actions to run if condition is false (array of dict elements)',
+                },
+            },
+            required: ['macroIdentifier', 'calculation'],
+        },
+    },
+    {
+        name: 'km_add_execute_macro',
+        description: 'Add an action to execute another macro.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                macroIdentifier: {
+                    type: 'string',
+                    description: 'Macro name or UID to add the action to',
+                },
+                macroToExecute: {
+                    type: 'string',
+                    description: 'Name or UID of the macro to execute',
+                },
+                parameter: {
+                    type: 'string',
+                    description: 'Optional parameter to pass to the executed macro',
+                },
+            },
+            required: ['macroIdentifier', 'macroToExecute'],
+        },
+    },
+    {
+        name: 'km_add_shell_script',
+        description: 'Add an action to execute a shell script.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                macroIdentifier: {
+                    type: 'string',
+                    description: 'Macro name or UID',
+                },
+                script: {
+                    type: 'string',
+                    description: 'Shell script to execute',
+                },
+                saveToVariable: {
+                    type: 'string',
+                    description: 'Optional: Variable name to save the script output to',
+                },
+            },
+            required: ['macroIdentifier', 'script'],
+        },
+    },
 ];
 
 // Handle tool listing
@@ -758,6 +980,105 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 if (!triggerIdx) throw new Error('triggerIndex is required');
                 if (!xml) throw new Error('xml is required');
                 const result = await setTriggerXml(macroId, triggerIdx, xml);
+                return { content: [{ type: 'text', text: result }] };
+            }
+
+            // High-level Action Helper Tools
+            case 'km_add_notification': {
+                const macroId = args?.macroIdentifier as string;
+                const title = args?.title as string;
+                const message = args?.message as string;
+                const subtitle = args?.subtitle as string | undefined;
+                if (!macroId) throw new Error('macroIdentifier is required');
+                if (!title) throw new Error('title is required');
+                if (!message) throw new Error('message is required');
+                const result = await addNotificationAction(macroId, title, message, subtitle);
+                return { content: [{ type: 'text', text: result }] };
+            }
+
+            case 'km_add_pause': {
+                const macroId = args?.macroIdentifier as string;
+                const seconds = args?.seconds as number;
+                if (!macroId) throw new Error('macroIdentifier is required');
+                if (seconds === undefined) throw new Error('seconds is required');
+                const result = await addPauseAction(macroId, seconds);
+                return { content: [{ type: 'text', text: result }] };
+            }
+
+            case 'km_add_set_variable': {
+                const macroId = args?.macroIdentifier as string;
+                const variable = args?.variable as string;
+                const value = args?.value as string;
+                if (!macroId) throw new Error('macroIdentifier is required');
+                if (!variable) throw new Error('variable is required');
+                if (value === undefined) throw new Error('value is required');
+                const result = await addSetVariableAction(macroId, variable, value);
+                return { content: [{ type: 'text', text: result }] };
+            }
+
+            case 'km_add_calculation': {
+                const macroId = args?.macroIdentifier as string;
+                const variable = args?.variable as string;
+                const expression = args?.expression as string;
+                if (!macroId) throw new Error('macroIdentifier is required');
+                if (!variable) throw new Error('variable is required');
+                if (!expression) throw new Error('expression is required');
+                const result = await addCalculationAction(macroId, variable, expression);
+                return { content: [{ type: 'text', text: result }] };
+            }
+
+            case 'km_add_display_text': {
+                const macroId = args?.macroIdentifier as string;
+                const title = args?.title as string;
+                const text = args?.text as string;
+                if (!macroId) throw new Error('macroIdentifier is required');
+                if (!title) throw new Error('title is required');
+                if (!text) throw new Error('text is required');
+                const result = await addDisplayTextAction(macroId, title, text);
+                return { content: [{ type: 'text', text: result }] };
+            }
+
+            case 'km_add_if_variable_contains': {
+                const macroId = args?.macroIdentifier as string;
+                const variable = args?.variable as string;
+                const containsValue = args?.containsValue as string;
+                const thenActionsXml = args?.thenActionsXml as string | undefined;
+                const elseActionsXml = args?.elseActionsXml as string | undefined;
+                if (!macroId) throw new Error('macroIdentifier is required');
+                if (!variable) throw new Error('variable is required');
+                if (!containsValue) throw new Error('containsValue is required');
+                const result = await addIfVariableContainsAction(macroId, variable, containsValue, thenActionsXml, elseActionsXml);
+                return { content: [{ type: 'text', text: result }] };
+            }
+
+            case 'km_add_if_calculation': {
+                const macroId = args?.macroIdentifier as string;
+                const calculation = args?.calculation as string;
+                const thenActionsXml = args?.thenActionsXml as string | undefined;
+                const elseActionsXml = args?.elseActionsXml as string | undefined;
+                if (!macroId) throw new Error('macroIdentifier is required');
+                if (!calculation) throw new Error('calculation is required');
+                const result = await addIfCalculationAction(macroId, calculation, thenActionsXml, elseActionsXml);
+                return { content: [{ type: 'text', text: result }] };
+            }
+
+            case 'km_add_execute_macro': {
+                const macroId = args?.macroIdentifier as string;
+                const macroToExecute = args?.macroToExecute as string;
+                const parameter = args?.parameter as string | undefined;
+                if (!macroId) throw new Error('macroIdentifier is required');
+                if (!macroToExecute) throw new Error('macroToExecute is required');
+                const result = await addExecuteMacroAction(macroId, macroToExecute, parameter);
+                return { content: [{ type: 'text', text: result }] };
+            }
+
+            case 'km_add_shell_script': {
+                const macroId = args?.macroIdentifier as string;
+                const script = args?.script as string;
+                const saveToVariable = args?.saveToVariable as string | undefined;
+                if (!macroId) throw new Error('macroIdentifier is required');
+                if (!script) throw new Error('script is required');
+                const result = await addShellScriptAction(macroId, script, saveToVariable);
                 return { content: [{ type: 'text', text: result }] };
             }
 

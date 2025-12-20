@@ -667,3 +667,277 @@ end tell`;
     cleanupTempFile(tempPath);
   }
 }
+
+// ============================================================================
+// HIGH-LEVEL ACTION HELPERS
+// These provide simpler interfaces for common action types
+// ============================================================================
+
+/**
+ * Add a notification action to a macro
+ */
+export async function addNotificationAction(
+  macroIdentifier: string,
+  title: string,
+  message: string,
+  subtitle?: string
+): Promise<string> {
+  const xml = `<dict>
+	<key>MacroActionType</key>
+	<string>Notification</string>
+	<key>Title</key>
+	<string>${escapeXml(title)}</string>
+	<key>Subtitle</key>
+	<string>${escapeXml(subtitle || '')}</string>
+	<key>Text</key>
+	<string>${escapeXml(message)}</string>
+</dict>`;
+  return addAction(macroIdentifier, xml);
+}
+
+/**
+ * Add a pause action to a macro
+ */
+export async function addPauseAction(
+  macroIdentifier: string,
+  seconds: number
+): Promise<string> {
+  const xml = `<dict>
+	<key>MacroActionType</key>
+	<string>Pause</string>
+	<key>Time</key>
+	<string>${seconds}</string>
+	<key>TimeOutAbortsMacro</key>
+	<true/>
+</dict>`;
+  return addAction(macroIdentifier, xml);
+}
+
+/**
+ * Add a set variable to text action
+ */
+export async function addSetVariableAction(
+  macroIdentifier: string,
+  variable: string,
+  value: string
+): Promise<string> {
+  const xml = `<dict>
+	<key>MacroActionType</key>
+	<string>SetVariableToText</string>
+	<key>Variable</key>
+	<string>${escapeXml(variable)}</string>
+	<key>Text</key>
+	<string>${escapeXml(value)}</string>
+</dict>`;
+  return addAction(macroIdentifier, xml);
+}
+
+/**
+ * Add a set variable to calculation action
+ */
+export async function addCalculationAction(
+  macroIdentifier: string,
+  variable: string,
+  expression: string
+): Promise<string> {
+  const xml = `<dict>
+	<key>MacroActionType</key>
+	<string>SetVariableToCalculation</string>
+	<key>Variable</key>
+	<string>${escapeXml(variable)}</string>
+	<key>Text</key>
+	<string>${escapeXml(expression)}</string>
+	<key>UseFormat</key>
+	<false/>
+</dict>`;
+  return addAction(macroIdentifier, xml);
+}
+
+/**
+ * Add a display text action (shows text in a window)
+ */
+export async function addDisplayTextAction(
+  macroIdentifier: string,
+  title: string,
+  text: string
+): Promise<string> {
+  const xml = `<dict>
+	<key>MacroActionType</key>
+	<string>DisplayText</string>
+	<key>Title</key>
+	<string>${escapeXml(title)}</string>
+	<key>Text</key>
+	<string>${escapeXml(text)}</string>
+</dict>`;
+  return addAction(macroIdentifier, xml);
+}
+
+/**
+ * Add an if-then-else action based on variable containing a value
+ */
+export async function addIfVariableContainsAction(
+  macroIdentifier: string,
+  variable: string,
+  containsValue: string,
+  thenActionsXml?: string,
+  elseActionsXml?: string
+): Promise<string> {
+  const thenActions = thenActionsXml ? thenActionsXml : '';
+  const elseActions = elseActionsXml ? elseActionsXml : '';
+
+  const xml = `<dict>
+	<key>MacroActionType</key>
+	<string>IfThenElse</string>
+	<key>Conditions</key>
+	<dict>
+		<key>ConditionList</key>
+		<array>
+			<dict>
+				<key>ConditionType</key>
+				<string>Variable</string>
+				<key>Variable</key>
+				<string>${escapeXml(variable)}</string>
+				<key>VariableConditionType</key>
+				<string>Contains</string>
+				<key>VariableValue</key>
+				<string>${escapeXml(containsValue)}</string>
+			</dict>
+		</array>
+		<key>ConditionListMatch</key>
+		<string>All</string>
+	</dict>
+	<key>ThenActions</key>
+	<array>${thenActions}</array>
+	<key>ElseActions</key>
+	<array>${elseActions}</array>
+	<key>TimeOutAbortsMacro</key>
+	<true/>
+</dict>`;
+  return addAction(macroIdentifier, xml);
+}
+
+/**
+ * Add an if-then-else action based on a calculation condition
+ */
+export async function addIfCalculationAction(
+  macroIdentifier: string,
+  calculation: string,
+  thenActionsXml?: string,
+  elseActionsXml?: string
+): Promise<string> {
+  const thenActions = thenActionsXml ? thenActionsXml : '';
+  const elseActions = elseActionsXml ? elseActionsXml : '';
+
+  const xml = `<dict>
+	<key>MacroActionType</key>
+	<string>IfThenElse</string>
+	<key>Conditions</key>
+	<dict>
+		<key>ConditionList</key>
+		<array>
+			<dict>
+				<key>ConditionType</key>
+				<string>Calculation</string>
+				<key>Text</key>
+				<string>${escapeXml(calculation)}</string>
+			</dict>
+		</array>
+		<key>ConditionListMatch</key>
+		<string>All</string>
+	</dict>
+	<key>ThenActions</key>
+	<array>${thenActions}</array>
+	<key>ElseActions</key>
+	<array>${elseActions}</array>
+	<key>TimeOutAbortsMacro</key>
+	<true/>
+</dict>`;
+  return addAction(macroIdentifier, xml);
+}
+
+/**
+ * Add an execute macro action
+ */
+export async function addExecuteMacroAction(
+  macroIdentifier: string,
+  macroToExecute: string,
+  parameter?: string
+): Promise<string> {
+  // First get the UID of the macro to execute
+  const macroInfo = await getMacro(macroToExecute);
+  const parsed = JSON.parse(macroInfo);
+  const macroUID = parsed.uid;
+
+  const xml = parameter
+    ? `<dict>
+	<key>MacroActionType</key>
+	<string>ExecuteMacro</string>
+	<key>MacroUID</key>
+	<string>${macroUID}</string>
+	<key>UseParameter</key>
+	<true/>
+	<key>Parameter</key>
+	<string>${escapeXml(parameter)}</string>
+	<key>TimeOutAbortsMacro</key>
+	<true/>
+	<key>Asynchronously</key>
+	<false/>
+</dict>`
+    : `<dict>
+	<key>MacroActionType</key>
+	<string>ExecuteMacro</string>
+	<key>MacroUID</key>
+	<string>${macroUID}</string>
+	<key>UseParameter</key>
+	<false/>
+	<key>TimeOutAbortsMacro</key>
+	<true/>
+	<key>Asynchronously</key>
+	<false/>
+</dict>`;
+  return addAction(macroIdentifier, xml);
+}
+
+/**
+ * Add a shell script action
+ */
+export async function addShellScriptAction(
+  macroIdentifier: string,
+  script: string,
+  saveToVariable?: string
+): Promise<string> {
+  const displayKind = saveToVariable ? 'Variable' : 'None';
+  const variableTag = saveToVariable
+    ? `<key>Variable</key>
+	<string>${escapeXml(saveToVariable)}</string>`
+    : '';
+
+  const xml = `<dict>
+	<key>MacroActionType</key>
+	<string>ExecuteShellScript</string>
+	<key>DisplayKind</key>
+	<string>${displayKind}</string>
+	${variableTag}
+	<key>Text</key>
+	<string>${escapeXml(script)}</string>
+	<key>UseText</key>
+	<true/>
+	<key>TimeOutAbortsMacro</key>
+	<true/>
+	<key>TrimResults</key>
+	<true/>
+</dict>`;
+  return addAction(macroIdentifier, xml);
+}
+
+/**
+ * Helper to escape XML special characters
+ */
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
